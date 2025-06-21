@@ -7,6 +7,7 @@ import os
 import subprocess
 
 in_game = False
+respawn = False
 
 root = Tk()
 root = root
@@ -39,8 +40,11 @@ def ExitFromGame():
         in_game = False
 
 def ResetCharacter():
+    global in_game, respawn
     if in_game == False:
         messagebox.showinfo("Rarte", "Чтобы сделать респавн, вам нужно быть в игре!")
+    else:
+        respawn = True
 
 
 editmenu = Menu(menubar, tearoff=0)
@@ -92,11 +96,21 @@ class Cube3D:
         self.animate()
         threading.Thread(target=self.step_1, daemon=True).start()
     def step_1(self):
+        global respawn
         while True:
             time.sleep(0.1)
             if in_game == False:
                 subprocess.Popen(["pythonw", "program.pyw"])
                 self.root.destroy()
+            else:
+                if respawn == True:
+                    print("Respawning!")
+                    self.scale = 100
+                    self.distance = 4
+                    self.angle_x = 0
+                    self.angle_y = 0
+                    respawn = False
+                    self.draw()
     
     def project(self, vertex):
         """Project 3D point to 2D using perspective projection with stabilization."""
