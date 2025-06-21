@@ -6,6 +6,8 @@ import threading
 import os
 import subprocess
 
+messagebox.showinfo("Rarte", "Внимание! Это еще Альфа версия!")
+
 in_game = False
 respawn = False
 
