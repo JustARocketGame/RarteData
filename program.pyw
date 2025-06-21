@@ -32,6 +32,23 @@ root.geometry(f"{window_width}x{window_height}+{x}+{y}")
 
 menubar = Menu(root)
 
+def read_file_content(file_path):
+  try:
+    with open(file_path, 'r') as file:
+      content = file.read()
+      return content
+  except FileNotFoundError:
+    print(f"Ошибка: Файл не найден по пути {file_path}")
+    return None
+  except Exception as e:
+    print(f"Ошибка при чтении файла: {e}")
+    return None
+
+
+# Пример использования:
+version_path = os.path.join(os.getcwd(), "version.txt") # Замените на реальный путь к файлу
+version = read_file_content(version_path)
+
 def ExitFromGame():
     global in_game
     if in_game == False:
@@ -547,6 +564,10 @@ game1_label.place(x=20, y=10)
 
 game1_play_button = Button(text="   Играть   ", command=Play)
 game1_play_button.place(x=20, y=45)
+
+
+version_label = Label(text="Версия: " + version, font='"Comic Sans MS" 15 bold', background="grey")
+version_label.place(x=5, y=560)
 
 root.config(background="grey")
 root.mainloop()
