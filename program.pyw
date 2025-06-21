@@ -235,6 +235,23 @@ class Character3D:
             [self.body_width, -self.body_height - self.leg_length, self.leg_width], [self.body_width - self.leg_width, -self.body_height - self.leg_length, self.leg_width]
         ]
         
+        # Tree vertices
+        self.tree_trunk_vertices = [
+            [-0.1, -0.5, -0.1], [0.1, -0.5, -0.1], [0.1, 0.5, -0.1], [-0.1, 0.5, -0.1],
+            [-0.1, -0.5, 0.1], [0.1, -0.5, 0.1], [0.1, 0.5, 0.1], [-0.1, 0.5, 0.1]
+        ]
+        self.tree_canopy_vertices = [
+            [-0.5, 0.5, -0.5], [0.5, 0.5, -0.5], [0.5, 0.5, 0.5], [-0.5, 0.5, 0.5],
+            [-0.5, 1.0, -0.5], [0.5, 1.0, -0.5], [0.5, 1.0, 0.5], [-0.5, 1.0, 0.5]
+        ]
+        self.tree_position = [2, 0, -2]  # Position of the tree relative to origin
+        
+        # Ground (very large cube)
+        self.ground_vertices = [
+            [-5.0, -0.6, -5.0], [5.0, -0.6, -5.0], [5.0, -0.5, -5.0], [-5.0, -0.5, -5.0],
+            [-5.0, -0.6, 5.0], [5.0, -0.6, 5.0], [5.0, -0.5, 5.0], [-5.0, -0.5, 5.0]
+        ]
+        
         # Edges for each part (same for all cuboids)
         self.edges = [
             (0, 1), (1, 2), (2, 3), (3, 0),  # Back face
@@ -255,16 +272,20 @@ class Character3D:
         # Projection parameters
         self.scale = 100
         self.distance = 4
-        self.angle_x = math.pi  # Rotate 180 degrees around x-axis to fix upside-down view
+        self.angle_x = math.pi  # Initial rotation around x-axis
         self.angle_y = 0
-        self.position = [0, 0, 0]  # Character position (x, y, z)
+        self.position = [0, 0, 0]  # Character and camera position
+        self.camera_offset = [0, 0.5, -2.5]  # Offset for third-person view
+        self.mouse_dragging = False
+        self.last_mouse_x = 0
+        self.last_mouse_y = 0
         
         # Controls
         self.controls_frame = Frame(root)
         self.controls_frame.pack()
-        Label(self.controls_frame, text="Arrow Keys: Rotate, WASD: Move").pack()
+        Label(self.controls_frame, text="Arrow Keys: Rotate, WASD: Move, RMB + Move: Rotate Camera & Player").pack()
         
-        # Bind keys
+        # Bind keys and mouse
         self.root.bind('<Left>', lambda event: self.rotate('y', -0.1))
         self.root.bind('<Right>', lambda event: self.rotate('y', 0.1))
         self.root.bind('<Up>', lambda event: self.rotate('x', -0.1))
@@ -273,6 +294,9 @@ class Character3D:
         self.root.bind('<s>', lambda event: self.move(0, 0, 0.1))   # Backward
         self.root.bind('<a>', lambda event: self.move(-0.1, 0, 0))  # Left
         self.root.bind('<d>', lambda event: self.move(0.1, 0, 0))   # Right
+        self.canvas.bind('<Button-3>', self.start_drag)
+        self.canvas.bind('<ButtonRelease-3>', self.stop_drag)
+        self.canvas.bind('<Motion>', self.drag)
         
         # Start animation
         self.animate()
@@ -305,7 +329,7 @@ class Character3D:
         factor = self.distance / (self.distance + z + epsilon)
         x = x * factor * self.scale + 200
         y = y * factor * self.scale + 200
-        return x, y
+        return x, y, z  # Return z for depth sorting
     
     def rotate_point(self, x, y, z, angle_x, angle_y):
         """Rotate point around x and y axes."""
@@ -326,10 +350,15 @@ class Character3D:
         return x, y, z
     
     def move(self, dx, dy, dz):
-        """Move character in 3D space."""
-        self.position[0] += dx
+        """Move character and camera in 3D space."""
+        # Convert movement direction based on current rotation
+        cos_y = math.cos(self.angle_y)
+        sin_y = math.sin(self.angle_y)
+        new_dx = dx * cos_y - dz * sin_y
+        new_dz = dx * sin_y + dz * cos_y
+        self.position[0] += new_dx
         self.position[1] += dy
-        self.position[2] += dz
+        self.position[2] += new_dz
         self.draw()
     
     def rotate(self, axis, angle):
@@ -340,12 +369,42 @@ class Character3D:
             self.angle_y += angle
         self.draw()
     
+    def start_drag(self, event):
+        """Start mouse dragging with RMB and fix cursor position."""
+        self.mouse_dragging = True
+        self.last_mouse_x = event.x
+        self.last_mouse_y = event.y
+        self.canvas.config(cursor='none')  # Hide cursor during drag
+    
+    def stop_drag(self, event):
+        """Stop mouse dragging with RMB and restore cursor."""
+        self.mouse_dragging = False
+        self.canvas.config(cursor='')  # Restore default cursor
+    
+    def drag(self, event):
+        """Rotate camera and player based on relative mouse movement while RMB is held."""
+        if self.mouse_dragging:
+            dx = event.x - self.last_mouse_x
+            dy = event.y - self.last_mouse_y
+            if dx != 0 or dy != 0:  # Only rotate if there is movement
+                self.rotate('y', -dx * 0.005)  # Rotate around y-axis
+                self.rotate('x', -dy * 0.005)  # Rotate around x-axis
+                # Update last position to current for relative movement
+                self.last_mouse_x = event.x
+                self.last_mouse_y = event.y
+                self.draw()
+    
     def draw(self):
-        """Draw the character using fresh transformations each frame."""
+        """Draw the character, tree, and ground using fresh transformations each frame."""
         self.canvas.delete("all")
         
-        # List of parts and their offsets
-        parts = [
+        # Apply camera offset relative to character position
+        camera_x = self.position[0] + self.camera_offset[0]
+        camera_y = self.position[1] + self.camera_offset[1]
+        camera_z = self.position[2] + self.camera_offset[2]
+        
+        # List of parts and their offsets (character)
+        character_parts = [
             (self.head_vertices, [0, self.body_height + self.head_size, 0]),  # Head above body
             (self.body_vertices, [0, 0, 0]),                          # Body at origin
             (self.left_arm_vertices, [0, self.body_height - self.arm_length, 0]),  # Left arm
@@ -354,7 +413,8 @@ class Character3D:
             (self.right_leg_vertices, [0, -self.body_height / 5, 0])  # Right leg higher up
         ]
         
-        for vertices, offset in parts:
+        # Draw character
+        for vertices, offset in character_parts:
             transformed_vertices = []
             for vertex in vertices:
                 # Apply part offset
@@ -363,16 +423,104 @@ class Character3D:
                 x += self.position[0]
                 y += self.position[1]
                 z += self.position[2]
-                # Rotate
+                # Rotate relative to character position
+                x -= self.position[0]
+                y -= self.position[1]
+                z -= self.position[2]
                 x, y, z = self.rotate_point(x, y, z, self.angle_x, self.angle_y)
-                # Project
-                x, y = self.project([x, y, z])
-                transformed_vertices.append((x, y))
+                x += self.position[0]
+                y += self.position[1]
+                z += self.position[2]
+                # Project relative to camera
+                x -= camera_x
+                y -= camera_y
+                z -= camera_z
+                x, y, z = self.project([x, y, z])
+                transformed_vertices.append((x, y, z))
             
-            # Draw filled faces instead of edges
+            # Sort faces by average z-depth to render back faces first
+            face_z = []
             for face in self.faces:
-                points = [transformed_vertices[i] for i in face]
-                self.canvas.create_polygon(points, fill='white', outline='black')
+                z_avg = sum(transformed_vertices[i][2] for i in face) / 4
+                face_z.append((face, z_avg))
+            face_z.sort(key=lambda x: x[1], reverse=True)  # Sort by z-depth, higher z first
+            
+            # Draw filled faces without outline
+            for face, _ in face_z:
+                points = [transformed_vertices[i][:2] for i in face]  # Use x, y only for canvas
+                self.canvas.create_polygon(points, fill='white')
+        
+        # Draw tree
+        tree_parts = [
+            (self.tree_trunk_vertices, self.tree_position),  # Trunk
+            (self.tree_canopy_vertices, [self.tree_position[0], self.tree_position[1] + 0.5, self.tree_position[2]])  # Canopy above trunk
+        ]
+        for vertices, offset in tree_parts:
+            transformed_vertices = []
+            for vertex in vertices:
+                # Apply part offset
+                x, y, z = vertex[0] + offset[0], vertex[1] + offset[1], vertex[2] + offset[2]
+                # Rotate relative to character position
+                x -= self.position[0]
+                y -= self.position[1]
+                z -= self.position[2]
+                x, y, z = self.rotate_point(x, y, z, self.angle_x, self.angle_y)
+                x += self.position[0]
+                y += self.position[1]
+                z += self.position[2]
+                # Project relative to camera
+                x -= camera_x
+                y -= camera_y
+                z -= camera_z
+                x, y, z = self.project([x, y, z])
+                transformed_vertices.append((x, y, z))
+            
+            # Sort faces by average z-depth to render back faces first
+            face_z = []
+            for face in self.faces:
+                z_avg = sum(transformed_vertices[i][2] for i in face) / 4
+                face_z.append((face, z_avg))
+            face_z.sort(key=lambda x: x[1], reverse=True)  # Sort by z-depth, higher z first
+            
+            # Draw filled faces with different colors for tree
+            for face, _ in face_z:
+                points = [transformed_vertices[i][:2] for i in face]  # Use x, y only for canvas
+                if vertices == self.tree_trunk_vertices:
+                    self.canvas.create_polygon(points, fill='brown')  # Trunk color
+                else:
+                    self.canvas.create_polygon(points, fill='green')  # Canopy color
+        
+        # Draw ground
+        transformed_vertices = []
+        for vertex in self.ground_vertices:
+            # Apply ground position (centered at origin, below character)
+            x, y, z = vertex[0], vertex[1], vertex[2]
+            # Rotate relative to character position
+            x -= self.position[0]
+            y -= self.position[1]
+            z -= self.position[2]
+            x, y, z = self.rotate_point(x, y, z, self.angle_x, self.angle_y)
+            x += self.position[0]
+            y += self.position[1]
+            z += self.position[2]
+            # Project relative to camera
+            x -= camera_x
+            y -= camera_y
+            z -= camera_z
+            x, y, z = self.project([x, y, z])
+            transformed_vertices.append((x, y, z))
+        
+        # Sort faces by average z-depth to render back faces first
+        face_z = []
+        for face in self.faces:
+            z_avg = sum(transformed_vertices[i][2] for i in face) / 4
+            face_z.append((face, z_avg))
+        face_z.sort(key=lambda x: x[1], reverse=True)  # Sort by z-depth, higher z first
+        
+        # Draw filled faces for ground
+        for face, _ in face_z:
+            points = [transformed_vertices[i][:2] for i in face]  # Use x, y only for canvas
+            self.canvas.create_polygon(points, fill='grey')  # Ground color
     
     def animate(self):
         """Animation loop."""
