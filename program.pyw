@@ -175,6 +175,210 @@ class Cube3D:
         self.draw()
         self.root.after(50, self.animate)
 
+class Character3D:
+    def __init__(self, root):
+        self.root = root
+        
+        # Canvas setup
+        self.canvas = Canvas(root, width=400, height=400, bg='grey')
+        self.canvas.pack(pady=20)
+        
+        # Character part sizes
+        self.head_size = 0.2
+        self.body_height = 0.6
+        self.body_width = 0.3
+        self.arm_length = 0.4
+        self.arm_width = 0.1
+        self.leg_length = 0.4
+        self.leg_width = 0.1
+        
+        # Head (cube)
+        self.head_vertices = [
+            [-self.head_size, -self.head_size, -self.head_size], [self.head_size, -self.head_size, -self.head_size],
+            [self.head_size, self.head_size, -self.head_size], [-self.head_size, self.head_size, -self.head_size],
+            [-self.head_size, -self.head_size, self.head_size], [self.head_size, -self.head_size, self.head_size],
+            [self.head_size, self.head_size, self.head_size], [-self.head_size, self.head_size, self.head_size]
+        ]
+        # Body (taller cuboid)
+        self.body_vertices = [
+            [-self.body_width, -self.body_height, -self.body_width], [self.body_width, -self.body_height, -self.body_width],
+            [self.body_width, self.body_height, -self.body_width], [-self.body_width, self.body_height, -self.body_width],
+            [-self.body_width, -self.body_height, self.body_width], [self.body_width, -self.body_height, self.body_width],
+            [self.body_width, self.body_height, self.body_width], [-self.body_width, self.body_height, self.body_width]
+        ]
+        # Left Arm (cuboid)
+        self.left_arm_vertices = [
+            [-self.body_width - self.arm_width, -self.arm_length, -self.arm_width], [-self.body_width, -self.arm_length, -self.arm_width],
+            [-self.body_width, self.arm_length, -self.arm_width], [-self.body_width - self.arm_width, self.arm_length, -self.arm_width],
+            [-self.body_width - self.arm_width, -self.arm_length, self.arm_width], [-self.body_width, -self.arm_length, self.arm_width],
+            [-self.body_width, self.arm_length, self.arm_width], [-self.body_width - self.arm_width, self.arm_length, self.arm_width]
+        ]
+        # Right Arm (symmetric to left)
+        self.right_arm_vertices = [
+            [self.body_width, -self.arm_length, -self.arm_width], [self.body_width + self.arm_width, -self.arm_length, -self.arm_width],
+            [self.body_width + self.arm_width, self.arm_length, -self.arm_width], [self.body_width, self.arm_length, -self.arm_width],
+            [self.body_width, -self.arm_length, self.arm_width], [self.body_width + self.arm_width, -self.arm_length, self.arm_width],
+            [self.body_width + self.arm_width, self.arm_length, self.arm_width], [self.body_width, self.arm_length, self.arm_width]
+        ]
+        # Left Leg (cuboid)
+        self.left_leg_vertices = [
+            [-self.body_width, -self.body_height, -self.leg_width], [-self.body_width + self.leg_width, -self.body_height, -self.leg_width],
+            [-self.body_width + self.leg_width, -self.body_height - self.leg_length, -self.leg_width], [-self.body_width, -self.body_height - self.leg_length, -self.leg_width],
+            [-self.body_width, -self.body_height, self.leg_width], [-self.body_width + self.leg_width, -self.body_height, self.leg_width],
+            [-self.body_width + self.leg_width, -self.body_height - self.leg_length, self.leg_width], [-self.body_width, -self.body_height - self.leg_length, self.leg_width]
+        ]
+        # Right Leg (symmetric to left)
+        self.right_leg_vertices = [
+            [self.body_width - self.leg_width, -self.body_height, -self.leg_width], [self.body_width, -self.body_height, -self.leg_width],
+            [self.body_width, -self.body_height - self.leg_length, -self.leg_width], [self.body_width - self.leg_width, -self.body_height - self.leg_length, -self.leg_width],
+            [self.body_width - self.leg_width, -self.body_height, self.leg_width], [self.body_width, -self.body_height, self.leg_width],
+            [self.body_width, -self.body_height - self.leg_length, self.leg_width], [self.body_width - self.leg_width, -self.body_height - self.leg_length, self.leg_width]
+        ]
+        
+        # Edges for each part (same for all cuboids)
+        self.edges = [
+            (0, 1), (1, 2), (2, 3), (3, 0),  # Back face
+            (4, 5), (5, 6), (6, 7), (7, 4),  # Front face
+            (0, 4), (1, 5), (2, 6), (3, 7)   # Connecting edges
+        ]
+        
+        # Faces for each part (define all six faces of a cube)
+        self.faces = [
+            (0, 1, 2, 3),  # Back face
+            (4, 5, 6, 7),  # Front face
+            (0, 1, 5, 4),  # Left face
+            (1, 2, 6, 5),  # Right face
+            (2, 3, 7, 6),  # Top face
+            (0, 3, 7, 4)   # Bottom face
+        ]
+        
+        # Projection parameters
+        self.scale = 100
+        self.distance = 4
+        self.angle_x = math.pi  # Rotate 180 degrees around x-axis to fix upside-down view
+        self.angle_y = 0
+        self.position = [0, 0, 0]  # Character position (x, y, z)
+        
+        # Controls
+        self.controls_frame = Frame(root)
+        self.controls_frame.pack()
+        Label(self.controls_frame, text="Arrow Keys: Rotate, WASD: Move").pack()
+        
+        # Bind keys
+        self.root.bind('<Left>', lambda event: self.rotate('y', -0.1))
+        self.root.bind('<Right>', lambda event: self.rotate('y', 0.1))
+        self.root.bind('<Up>', lambda event: self.rotate('x', -0.1))
+        self.root.bind('<Down>', lambda event: self.rotate('x', 0.1))
+        self.root.bind('<w>', lambda event: self.move(0, 0, -0.1))  # Forward
+        self.root.bind('<s>', lambda event: self.move(0, 0, 0.1))   # Backward
+        self.root.bind('<a>', lambda event: self.move(-0.1, 0, 0))  # Left
+        self.root.bind('<d>', lambda event: self.move(0.1, 0, 0))   # Right
+        
+        # Start animation
+        self.animate()
+        threading.Thread(target=self.step_1, daemon=True).start()
+    
+    def step_1(self):
+        global respawn
+        while True:
+            time.sleep(0.1)
+            if not in_game:
+                self.canvas.pack_forget()
+                self.controls_frame.pack_forget()
+                game1_label.place(x=20, y=10)
+                game1_play_button.place(x=20, y=45)
+                break  # Exit thread to avoid restarting
+            else:
+                if respawn:
+                    self.scale = 100
+                    self.distance = 4
+                    self.angle_x = math.pi  # Reset to 180 degrees
+                    self.angle_y = 0
+                    self.position = [0, 0, 0]  # Reset position
+                    respawn = False
+                    self.draw()
+    
+    def project(self, vertex):
+        """Project 3D point to 2D using perspective projection with stabilization."""
+        x, y, z = vertex
+        epsilon = 0.01
+        factor = self.distance / (self.distance + z + epsilon)
+        x = x * factor * self.scale + 200
+        y = y * factor * self.scale + 200
+        return x, y
+    
+    def rotate_point(self, x, y, z, angle_x, angle_y):
+        """Rotate point around x and y axes."""
+        cos_x = math.cos(angle_x)
+        sin_x = math.sin(angle_x)
+        y_new = y * cos_x - z * sin_x
+        z_new = y * sin_x + z * cos_x
+        y = y_new
+        z = z_new
+        
+        cos_y = math.cos(angle_y)
+        sin_y = math.sin(angle_y)
+        x_new = x * cos_y + z * sin_y
+        z_new = -x * sin_y + z * cos_y
+        x = x_new
+        z = z_new
+        
+        return x, y, z
+    
+    def move(self, dx, dy, dz):
+        """Move character in 3D space."""
+        self.position[0] += dx
+        self.position[1] += dy
+        self.position[2] += dz
+        self.draw()
+    
+    def rotate(self, axis, angle):
+        """Update rotation angles."""
+        if axis == 'x':
+            self.angle_x += angle
+        elif axis == 'y':
+            self.angle_y += angle
+        self.draw()
+    
+    def draw(self):
+        """Draw the character using fresh transformations each frame."""
+        self.canvas.delete("all")
+        
+        # List of parts and their offsets
+        parts = [
+            (self.head_vertices, [0, self.body_height + self.head_size, 0]),  # Head above body
+            (self.body_vertices, [0, 0, 0]),                          # Body at origin
+            (self.left_arm_vertices, [0, self.body_height - self.arm_length, 0]),  # Left arm
+            (self.right_arm_vertices, [0, self.body_height - self.arm_length, 0]), # Right arm
+            (self.left_leg_vertices, [0, -self.body_height / 5, 0]),  # Left leg higher up
+            (self.right_leg_vertices, [0, -self.body_height / 5, 0])  # Right leg higher up
+        ]
+        
+        for vertices, offset in parts:
+            transformed_vertices = []
+            for vertex in vertices:
+                # Apply part offset
+                x, y, z = vertex[0] + offset[0], vertex[1] + offset[1], vertex[2] + offset[2]
+                # Apply character position
+                x += self.position[0]
+                y += self.position[1]
+                z += self.position[2]
+                # Rotate
+                x, y, z = self.rotate_point(x, y, z, self.angle_x, self.angle_y)
+                # Project
+                x, y = self.project([x, y, z])
+                transformed_vertices.append((x, y))
+            
+            # Draw filled faces instead of edges
+            for face in self.faces:
+                points = [transformed_vertices[i] for i in face]
+                self.canvas.create_polygon(points, fill='white', outline='black')
+    
+    def animate(self):
+        """Animation loop."""
+        self.draw()
+        self.root.after(50, self.animate)
+
 
 root.config(menu=menubar)
 
@@ -188,7 +392,7 @@ def Play():
     game1_label.place_forget()
     game1_play_button.place_forget()
 
-    Cube3D(root)
+    Character3D(root)
 
 game1_label = Label(text="Игра 1", font='"Comic Sans MS" 15 bold', background="grey")
 game1_label.place(x=20, y=10)
