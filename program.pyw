@@ -86,7 +86,7 @@ class Cube3D:
         # Controls
         self.controls_frame = Frame(root)
         self.controls_frame.pack()
-        #Label(self.controls_frame, text="Use Arrow Keys to Rotate").pack()
+        Label(self.controls_frame, text="Use Arrow Keys to Rotate").pack()
         
         # Bind keys
         self.root.bind('<Left>', lambda event: self.rotate('y', -0.1))
